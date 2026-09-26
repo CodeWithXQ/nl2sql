@@ -1,0 +1,6 @@
+pymysql>=1.1
+openai>=1.40
+pydantic>=2.6
+fastapi>=0.110
+uvicorn>=0.29
+sqlglot>=25.0
