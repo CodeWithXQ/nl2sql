@@ -70,6 +70,15 @@ TESTSET: list[tuple[str, str]] = [
     ("各品类商品的平均价格", "SELECT category, AVG(price) FROM products GROUP BY category"),
     ("订单金额排名前10的平均金额", "SELECT AVG(amount) FROM (SELECT amount FROM orders ORDER BY amount DESC LIMIT 10) t"),
     ("每个等级用户的订单数", "SELECT u.level, COUNT(o.id) FROM orders o JOIN users u ON o.user_id=u.id GROUP BY u.level"),
+    # --- 复杂查询（LLM 易错点：HAVING / NOT IN / 子查询比较 / 枚举"及以上"语义）---
+    ("订单数超过10的城市", "SELECT u.city FROM orders o JOIN users u ON o.user_id=u.id GROUP BY u.city HAVING COUNT(*)>10"),
+    ("没有下过订单的用户数量", "SELECT COUNT(*) FROM users WHERE id NOT IN (SELECT user_id FROM orders)"),
+    ("下单金额高于平均值的订单数量", "SELECT COUNT(*) FROM orders WHERE amount>(SELECT AVG(amount) FROM orders)"),
+    ("订单总金额超过50000的城市", "SELECT u.city FROM orders o JOIN users u ON o.user_id=u.id GROUP BY u.city HAVING SUM(o.amount)>50000"),
+    ("价格高于平均价格的商品数量", "SELECT COUNT(*) FROM products WHERE price>(SELECT AVG(price) FROM products)"),
+    ("每个城市金额最高的订单金额", "SELECT u.city, MAX(o.amount) FROM orders o JOIN users u ON o.user_id=u.id GROUP BY u.city"),
+    ("订单金额排名前5的用户所在城市", "SELECT u.city FROM orders o JOIN users u ON o.user_id=u.id GROUP BY u.user_id, u.city ORDER BY SUM(o.amount) DESC LIMIT 5"),
+    ("银卡及以上会员的订单总金额", "SELECT SUM(o.amount) FROM orders o JOIN users u ON o.user_id=u.id WHERE u.level IN ('银卡','金卡','钻石')"),
 ]
 
 
@@ -129,6 +138,12 @@ def run_security() -> None:
         ("SELECT * FROM users WHERE city='北京'", "ops"),
         ("SELECT id FROM products", "guest"),
         ("SELECT * FROM orders o JOIN users u ON o.user_id=u.id", "ops"),
+        # 绕过样本：子查询 / CTE / 标量子查询 / EXISTS 试图访问无权限表
+        ("SELECT * FROM (SELECT * FROM users) t", "ops"),
+        ("WITH x AS (SELECT * FROM users) SELECT * FROM x", "ops"),
+        ("SELECT * FROM orders WHERE user_id IN (SELECT id FROM users)", "ops"),
+        ("SELECT (SELECT city FROM users LIMIT 1) FROM orders", "ops"),
+        ("SELECT * FROM orders o WHERE EXISTS (SELECT 1 FROM users u WHERE u.id=o.user_id AND u.city='北京')", "ops"),
     ]
     blocked = sum(1 for sql, u in perm_samples if not validate(sql, u, rbac).ok)
     print(f"越权拦截率：{blocked}/{len(perm_samples)} = {blocked / len(perm_samples) * 100:.0f}%")
@@ -143,6 +158,10 @@ def run_security() -> None:
         "UPDATE orders SET status='done'",
         "DELETE FROM users",
         "SELECT BENCHMARK(10000000, MD5('x')) FROM orders",
+        # 绕过样本：注释 / CTE / UNION 隐藏多语句写操作
+        "SELECT * FROM orders /*x*/; DROP TABLE users",
+        "WITH x AS (SELECT 1) SELECT * FROM x; DROP TABLE users",
+        "SELECT * FROM orders UNION SELECT * FROM users; UPDATE users SET level='钻石'",
     ]
     blocked_inj = sum(1 for sql in inj_samples if not validate(sql, "analyst", rbac).ok)
     print(f"注入拦截率：{blocked_inj}/{len(inj_samples)} = {blocked_inj / len(inj_samples) * 100:.0f}%")
