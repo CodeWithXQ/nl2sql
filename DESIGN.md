@@ -181,7 +181,7 @@ products（新造 1000 行）：id, name, category, price
 | M1（Day1-2） | Schema 管理 + 权限管理 + users/products 造数 |
 | M2（Day3-5） | SQL 生成 + 四道关校验器 |
 | M3（Day6-8） | 50 条测试集 + 评测四指标 |
-| M4（Day9-10） | FastAPI + README + 面试深挖点 + GitHub |
+| M4（Day9-10） | FastAPI + README + GitHub |
 
 ---
 
@@ -195,18 +195,7 @@ products（新造 1000 行）：id, name, category, price
 
 ---
 
-## 10. 面试深挖点预案
-
-1. **这不就是调 ChatGPT 生成 SQL 吗？** → 生成只是第一步，我的核心在「四道关校验」：注入防护、表级权限、Schema 对齐、只读——没有这套校验，生成出来的 SQL 敢在生产跑吗？
-2. **怎么防 SQL 注入？** → 用户输入绝不拼进 SQL，只执行 LLM 生成后过校验器的 SQL；黑名单 + 多语句检测 + 只读 + 只放行 SELECT。
-3. **怎么保证不越权？** → RBAC 表级权限，生成 SQL 后提取涉及的表，和授权表比对，越权直接拒绝。
-4. **怎么防止 LLM 瞎编列名？** → prompt 里给真实 schema（表/列/类型），生成后用 sqlglot 解析 + EXPLAIN 试跑，编造的列 EXPLAIN 直接报错拦截。
-5. **正确率怎么测的？** → 自建 50 条 NL2SQL 测试集，比对执行结果；诚实说这是构造数据非生产。
-6. **和 DB Doctor / TPC-H 什么关系？** → 一条主线三层：造引擎 → 治病 → 对话。
-
----
-
-## 11. 诚实边界
+## 10. 诚实边界
 
 - 数据自建，非真实生产。
 - 正确率基于自构造测试集，非生产验证。
@@ -215,7 +204,7 @@ products（新造 1000 行）：id, name, category, price
 
 ---
 
-## 12. 风险与对策
+## 11. 风险与对策
 
 | 风险 | 对策 |
 |---|---|
